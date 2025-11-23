@@ -1,0 +1,2 @@
+data/glove filter=lfs diff=lfs merge=lfs -text
+data/lys_trial_data filter=lfs diff=lfs merge=lfs -text
