@@ -1,2 +1,4 @@
-data/glove filter=lfs diff=lfs merge=lfs -text
-data/lys_trial_data filter=lfs diff=lfs merge=lfs -text
+[attr]lfs filter=lfs diff=lfs merge=binary -text
+*.pzd lfs
+*.jsonl lfs
+*/glove.840B.300d.txt lfs
