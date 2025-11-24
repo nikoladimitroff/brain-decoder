@@ -1,5 +1,11 @@
 import numpy as np
 
+class Vec:
+    def __init__(self, x: int, y: int, z: int):
+        self.x = x
+        self.y = y
+        self.z = z
+
 class StimulusEntry:
     def __init__(self, label: str, start_time: float, end_time: float):#, wordcloud_file: str):
         self.label = label
