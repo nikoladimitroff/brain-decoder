@@ -3,32 +3,16 @@ import numpy as np
 class StimulusEntry:
     def __init__(self, label: str, start_time: float, end_time: float):#, wordcloud_file: str):
         self.label = label
-        self.start_time = np.float32(start_time)
-        self.end_time = np.float32(end_time)
+        self.start_time = np.float64(start_time)
+        self.end_time = np.float64(end_time)
         #self.wordcloud_file = wordcloud_file
 
     @property
-    def duration(self) -> np.float32:
+    def duration(self) -> np.float64:
         return self.end_time - self.start_time
     
     def __repr__(self):
         return f"{self.label}: start_time={self.start_time:.2f}, duration={self.duration:.2f}"
-
-
-class BrainDataEntry:
-    def __init__(self, session_data, entry_idx: int):
-        self.session_data = session_data
-        self.entry_idx = entry_idx
-
-    @property
-    def time(self) -> np.float32:
-        return self.session_data["time"][self.entry_idx]
-    
-    def get_hbo(self, x: int, y: int, z: int) -> np.float32:
-        return self.session_data["hbo"][x][y][z][self.entry_idx]
-
-    def get_hbr(self, x: int, y: int, z: int) -> np.float32:
-        return self.session_data["hbr"][x][y][z][self.entry_idx]
 
 class SessionData:
     def __init__(self, idx: int, brain_data: np.ndarray, stimulus_data: list[StimulusEntry]):
@@ -54,7 +38,7 @@ class SessionData:
 
 
 class ConceptActivationEntry:
-    def __init__(self, x: int, y: int, z: int, hbo: np.float32, hbr: np.float32):
+    def __init__(self, x: int, y: int, z: int, hbo: np.float64, hbr: np.float64):
         self.x = x
         self.y = y
         self.z = z
@@ -78,6 +62,10 @@ class ConceptActivationEntry:
             x=data['x'],
             y=data['y'],
             z=data['z'],
-            hbo=np.float32(data['hbo']),
-            hbr=np.float32(data['hbr'])
+            hbo=np.float64(data['hbo']),
+            hbr=np.float64(data['hbr'])
         )
+    
+    def __repr__(self):
+        return f"(x={self.x}, y={self.y}, z={self.z}, hbo={self.hbo}, hbr={self.hbr})"
+

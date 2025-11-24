@@ -89,7 +89,13 @@ def map_concept_braindata(session_data, stimulus: StimulusEntry):
         entries.append(data_entry)
     return entries
 
+
 if __name__ == '__main__':
+    a = np.array([[[1,2],[3,4]],[[5,6],[7,8]],])
+    b = np.reshape(a, -1)
+    print(b)
+
+if __name__ == '__main__' and False:
     data_dir = Path('C:\\Dev\\brain-decoder\\data\\lys_trial_data')
     session_paths = data_dir.glob("session-*/")
     sessions = {}
