@@ -9,25 +9,6 @@ import subprocess
 from entries import *
 import decoder
 
-def get_glove_embedding(stimulus, embeddings_dict):
-    return embeddings_dict[stimulus]
-    
-
-def get_embeddings_dict(glove_path, embedding_dim=300):
-    """
-    Download the GloVe embeddings from:
-        wget http://nlp.stanford.edu/data/glove.840B.300d.zip
-        unzip glove.840B.300d.zip
-    """
-    embeddings = {}
-    with open(glove_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            values = line.rstrip().rsplit(' ', embedding_dim)
-            word = values[0]
-            vector = np.array(values[1:], dtype='float32')
-            embeddings[word] = vector
-    return embeddings
-
 def main():
     
     sessions = decoder.parse_all_sessions()

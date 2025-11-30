@@ -5,7 +5,6 @@ import numpy as np
 from pathlib import Path
 from entries import *
 
-
 def getGitRoot():
     return subprocess.Popen(['git', 'rev-parse', '--show-toplevel'], stdout=subprocess.PIPE).communicate()[0].rstrip().decode('utf-8')
 
@@ -23,8 +22,8 @@ def average_signal_across_stimuli(signal_values: np.ndarray) -> np.float64:
 
 # Implement this to define how important changes are from rested to the stimulus
 def signal_delta(stimulus_value: np.float64, rest_value: np.float64) -> np.float64:
-    # todo: may be take the sqrt to emphasize changes more?
-    return (stimulus_value - rest_value)
+    # todo: should we boost changes more?
+    return (stimulus_value - rest_value) ** 2
 
 def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: str) -> list[ConceptActivationEntry]:
     aggregated_activations: dict[tuple[int, int, int], list[ConceptActivationEntry]] = {}
@@ -41,7 +40,7 @@ def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: 
                     aggregated_activations[coords] = []
                 aggregated_activations[coords].append(entry)
 
-    assert(len(aggregated_activations) > 0, f"No activations found for stimulus label '{stimulus_label}' across all sessions")
+    assert len(aggregated_activations) > 0, f"No activations found for stimulus label '{stimulus_label}' across all sessions"
 
     # Now average the activations across sessions
     averaged_activations: list[ConceptActivationEntry] = []
@@ -50,7 +49,7 @@ def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: 
         avg_hbr = average_signal_across_stimuli(np.array([e.hbr for e in entries]))
         averaged_activations.append(ConceptActivationEntry(coords[0], coords[1], coords[2], avg_hbo, avg_hbr))
 
-    assert(len(averaged_activations) > 0, "No activations found for the given stimulus label")
+    assert len(averaged_activations) > 0, "No activations found for the given stimulus label"
     return averaged_activations
 
 
@@ -60,7 +59,7 @@ def extract_stimulus_delta(session_data: SessionData, stimulus_idx: int) -> list
     # get the indices corresponding to the stimulus time range
     # nonzero returns a tuple, we only care about the first step
     fixation = session_data.stimulus_data[stimulus_idx - 1]
-    assert(fixation.label == "rest")
+    assert fixation.label == "rest"
     stimulus = session_data.stimulus_data[stimulus_idx]
     stimulus_activations = extract_activations_for_stimulus(session_data, stimulus)
     fixation_activations = extract_activations_for_stimulus(session_data, fixation)
@@ -150,3 +149,7 @@ def parse_all_sessions() -> list[SessionData]:
         protocol = parse_session_protocol(session)
         sessions.append(SessionData(idx, brain_data, protocol))
     return sessions
+
+def get_all_concepts(sessions: list[SessionData]) -> set[str]:
+    return { stimulus.label for session in sessions for stimulus in session.stimulus_data }
+
