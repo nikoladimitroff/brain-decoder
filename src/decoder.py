@@ -13,7 +13,8 @@ def getGitRoot():
 def average_signal_in_same_stimulus(signal_values: np.ndarray) -> np.float64:
     if len(signal_values) == 0:
         return np.float64(0.0)
-    return cast(np.float64, np.average(signal_values))
+    # TODO: are all values positive? If HBR is negative (which I suspect), we want the biggest amplitutude which would require a smarter function
+    return cast(np.float64, np.max(signal_values))
 
 def average_signal_across_stimuli(signal_values: np.ndarray) -> np.float64:
     if len(signal_values) == 0:
@@ -26,6 +27,7 @@ def signal_delta(stimulus_value: np.float64, rest_value: np.float64) -> np.float
     return (stimulus_value - rest_value) ** 2
 
 def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: str) -> list[ConceptActivationEntry]:
+    """Extract the average activations for a given stimulus label across all sessions."""
     aggregated_activations: dict[tuple[int, int, int], list[ConceptActivationEntry]] = {}
     for session in sessions:
         print(f"Searching session {session.idx} for stimulus '{stimulus_label}'")
