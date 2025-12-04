@@ -37,10 +37,6 @@ class SessionData:
     @property
     def max_z(self) -> int:
         return len(self.brain_data["hbo"][0][0])
-    
-    @property
-    def max_t(self) -> np.float32:
-        return np.max(self.brain_data["time"])
 
 
 class ConceptActivationEntry:

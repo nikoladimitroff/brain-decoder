@@ -1,22 +1,15 @@
+from multiprocessing.pool import Pool
 import pathlib
-from typing import cast
-from xml.parsers.expat import model
-import numpy as np
-import torch
-import decoder
-import embedder
 import json
 import os
+from typing import cast
 
-class SingleEmbeddingAxisLinearRegressionModel(torch.nn.Module):
-    def __init__(self, brain_data_dim):
-        """Initialize linear regression model for a single GloVe dimension."""
-        super(SingleEmbeddingAxisLinearRegressionModel, self).__init__()
-        self.linear = torch.nn.Linear(brain_data_dim, 1)
+import numpy as np
 
-    def forward(self, x):
-        y_pred = self.linear(x)
-        return y_pred
+import decoder
+import embedder
+
+DIMENSIONS_TO_PREDICT = 300
 
 class SingleConceptTrainingExample:
     def __init__(self, concept: str, brain_data: np.ndarray, embedding: np.ndarray):
@@ -24,77 +17,20 @@ class SingleConceptTrainingExample:
         self.brain_data = brain_data  # shape: (n_features,)
         self.embedding = embedding  # shape: (300,)
 
-
-class TrainingDataPerEmbeddingAxis:
-    def __init__(self, concepts: list[str], brain_data: np.ndarray, embedding_values: np.ndarray):
-        self.concepts = concepts
-        self.brain_data_dimensions = brain_data.shape[1]
-        self.brain_data = torch.autograd.Variable(torch.as_tensor(brain_data))  # shape: (n_features,)
-        self.embedding_values = torch.autograd.Variable(torch.as_tensor(embedding_values))  # shape: (300,)
-
-def train_linear_models(training_data: list[TrainingDataPerEmbeddingAxis], w1=1.0, w2=1.0):
+def calculate_goal_feature(entry: decoder.ConceptActivationEntry, w1=2.0, w2=1.0) -> float:
     """
-    Train ensemble of linear regression predictors for each GloVe dimension.
-    
-    Args:
-        sessions_data: List of session data containing HBO and HBR
-        glove_embeddings: GloVe embeddings (300 dimensions)
-        w1, w2: Weights for HBO and HBR combination
-    """
-    dimension_count = 10
-    
-    # Store predictors for each dimension
-    predictors = []
-    
-    for dim in range(dimension_count):
-        print(f"Training predictor for dimension {dim + 1}/{dimension_count}")
-        next_model = SingleEmbeddingAxisLinearRegressionModel(training_data[dim].brain_data_dimensions)
-        criterion = torch.nn.MSELoss()
-        optimizer = torch.optim.SGD(next_model.parameters(), lr=0.01)
-        predictors.append(next_model)
-
-        for epoch in range(50):
-            # Forward pass: Compute predicted y by passing 
-            # x to the model
-            predicted_value = next_model(training_data[dim].brain_data)
-
-            # Compute and print loss
-            loss = criterion(predicted_value, training_data[dim].embedding_values)
-
-            # Zero gradients, perform a backward pass, 
-            # and update the weights.
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            print(f"dim {dim}, epoch {epoch}, loss {loss.item()}")
-        
-    
-    return predictors
-
-
-def predict_glove_embeddings(predictors: list[SingleEmbeddingAxisLinearRegressionModel], brain_data: np.ndarray) -> np.ndarray:
-    """
-    Predict GloVe embeddings using trained ensemble.
-    """
-    
-    predictions = np.zeros(300)
-    
-    for dim, model in enumerate(predictors):
-        predictions[dim] = model.predict(brain_data)
-    
-    return predictions
-
-
-def calculate_goal_feature(entry: decoder.ConceptActivationEntry, w1=1.0, w2=1.0) -> float:
-    """
-    Calculate combined feature for a vortex using weights w1 and w2.
+    Calculate combined feature for a vortex using weights w1 and w2 - this makes the implementation
+    easier because we don't have to deal with multi-dimensional outputs in the model.
+    The values are completely arbitrary and can be tuned later.
+    HBO is weighted more heavily because it tends to have stronger corelation
+    with brain activation according to some papers.
     """
     return entry.hbo * w1 + entry.hbr * w2
 
 
 def load_vortex_activations(sessions: list[decoder.SessionData], concepts: list[str]) -> dict[tuple[int, int, int], dict[str, float]]:
     session_ids = "-".join(str(session.idx) for session in sessions)
-    cache_file = pathlib.Path(decoder.getGitRoot()) / f"data/cache/all-vortex-data-{session_ids}.json"
+    cache_file = pathlib.Path(decoder.getGitRoot()) / f"data/cache/vortex-data/{len(concepts)}-vortex-data-({session_ids}).json"
     
     vortex_to_concept_activations: dict[tuple[int, int, int], dict[str, float]] = {}
 
@@ -119,7 +55,7 @@ def load_vortex_activations(sessions: list[decoder.SessionData], concepts: list[
             vortex_to_concept_activations[coords][concept] = calculate_goal_feature(entry)
     
     # Save to cache
-    os.makedirs("data/cache", exist_ok=True)
+    os.makedirs("data/cache/vortex-data", exist_ok=True)
     cache_data = {}
     for coords, concept_dict in vortex_to_concept_activations.items():
         cache_data[str(coords)] = concept_dict
@@ -131,9 +67,6 @@ def load_vortex_activations(sessions: list[decoder.SessionData], concepts: list[
 
 
 def generate_training_data(sessions: list[decoder.SessionData], concepts: list[str], w1=1.0, w2=1.0) -> list[SingleConceptTrainingExample]:
-    """
-    Generate training data for ensemble predictors.
-    """
     # Step 1: gather all vortices that have non-zero activations for at least 1 concept to reduce data size
     vortex_to_concept_activations: dict[tuple[int, int, int], dict[str, float]] = load_vortex_activations(sessions, concepts)
 
@@ -153,22 +86,3 @@ def generate_training_data(sessions: list[decoder.SessionData], concepts: list[s
 
     return all_examples
 
-
-# Example usage
-if __name__ == "__main__":
-    # Load your session data here
-    sessions = decoder.parse_all_sessions()
-    concepts = decoder.get_all_concepts(sessions)
-    embedder.load_embeddings(concepts)
-    concepts = list(concepts)
-    
-    # Train ensemble
-    training_examples = generate_training_data(sessions, concepts)
-    brain_data_matrix = np.array([ex.brain_data for ex in training_examples])
-    training_data_per_axis: list[TrainingDataPerEmbeddingAxis] = []
-    for dim in range(300):
-        embedding_matrix = np.array([ex.embedding[dim] for ex in training_examples])
-        training_data_per_axis.append(TrainingDataPerEmbeddingAxis(concepts, brain_data_matrix, embedding_matrix))
-
-    predictors = train_linear_models(training_data_per_axis)
-    

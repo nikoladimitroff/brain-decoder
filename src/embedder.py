@@ -9,7 +9,7 @@ GLOVE_EMBEDDINGS = {}
 def get_glove_embedding(stimulus):
     return GLOVE_EMBEDDINGS[stimulus]    
 
-def load_embeddings(concepts: set[str], embedding_dim=300):
+def load_embeddings(concepts: list[str], embedding_dim=300):
     """
     Download the GloVe embeddings from:
         wget http://nlp.stanford.edu/data/glove.840B.300d.zip

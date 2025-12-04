@@ -28,6 +28,20 @@ def signal_delta(stimulus_value: np.float64, rest_value: np.float64) -> np.float
 
 def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: str) -> list[ConceptActivationEntry]:
     """Extract the average activations for a given stimulus label across all sessions."""
+    # Create cache key based on session IDs and stimulus label
+    session_ids = sorted([session.idx for session in sessions])
+    cache_key = f"sessions-({'-'.join(map(str, session_ids))})-{stimulus_label}"
+    cache_file = Path(getGitRoot()) / "data/cache/stimuli" / f"{cache_key}.json"
+    
+    # Check if cache exists
+    if cache_file.exists():
+        print(f"Loading cached results for stimulus '{stimulus_label}'")
+        with open(cache_file, 'r') as f:
+            cached_data = json.load(f)
+        return [ConceptActivationEntry(entry['x'], entry['y'], entry['z'], 
+                                     np.float64(entry['hbo']), np.float64(entry['hbr'])) 
+                for entry in cached_data]
+    
     aggregated_activations: dict[tuple[int, int, int], list[ConceptActivationEntry]] = {}
     for session in sessions:
         print(f"Searching session {session.idx} for stimulus '{stimulus_label}'")
@@ -52,6 +66,16 @@ def extract_average_stimulus_delta(sessions: list[SessionData], stimulus_label: 
         averaged_activations.append(ConceptActivationEntry(coords[0], coords[1], coords[2], avg_hbo, avg_hbr))
 
     assert len(averaged_activations) > 0, "No activations found for the given stimulus label"
+    
+    # Save to cache
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_data = [{'x': entry.x, 'y': entry.y, 'z': entry.z, 
+                   'hbo': float(entry.hbo), 'hbr': float(entry.hbr)} 
+                  for entry in averaged_activations]
+    with open(cache_file, 'w') as f:
+        json.dump(cache_data, f)
+    print(f"Results cached to {cache_file}")
+    
     return averaged_activations
 
 
@@ -61,7 +85,7 @@ def extract_stimulus_delta(session_data: SessionData, stimulus_idx: int) -> list
     # get the indices corresponding to the stimulus time range
     # nonzero returns a tuple, we only care about the first step
     fixation = session_data.stimulus_data[stimulus_idx - 1]
-    assert fixation.label == "rest"
+    assert fixation.label == "rest", f"Expected fixation/rest stimulus before stimulus at index {stimulus_idx}, found '{fixation.label}' instead in session {session_data.idx}"
     stimulus = session_data.stimulus_data[stimulus_idx]
     stimulus_activations = extract_activations_for_stimulus(session_data, stimulus)
     fixation_activations = extract_activations_for_stimulus(session_data, fixation)
@@ -132,13 +156,6 @@ def parse_session_protocol(session_path: Path) -> list[StimulusEntry]:
                 #wordcloud_file = entry["event"]["file"]
                 events.append(StimulusEntry(stimulus, start_time, end_time))#, wordcloud_file))
 
-            #if entry["event"]["event_type"] in ['stimulus', 'fixation']:
-            #    stimulus = entry["event"]["label"]
-            #    start_time = entry["event"]["start_ms"]
-            #    end_time = entry["event"]["end_ms"]
-            #    wordcloud_file = entry["event"]["file"]
-            #    events.append({"stimulus": stimulus, "start_time": start_time, "end_time": end_time, "wordcloud_file": wordcloud_file})
-
     return events
     
 
@@ -153,5 +170,6 @@ def parse_all_sessions() -> list[SessionData]:
     return sessions
 
 def get_all_concepts(sessions: list[SessionData]) -> set[str]:
-    return { stimulus.label for session in sessions for stimulus in session.stimulus_data }
+    # "rest" is not a concept, it's just the fixation baseline
+    return { stimulus.label for session in sessions for stimulus in session.stimulus_data } - {"rest"}
 
